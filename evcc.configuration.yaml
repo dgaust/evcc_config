@@ -1,0 +1,93 @@
+# open evcc at http://evcc.local:7070
+network:
+  schema: http
+  host: evcc.local # .local suffix announces the hostname on MDNS
+  port: 7070
+
+interval: 30s
+
+database:
+  type: sqlite
+  dsn: /home/dgaust/.evcc/evcc.db
+
+log: debug
+levels:
+  cache: error
+
+# unique installation id
+plant: [redacted]
+
+meters:
+- type: custom
+  name: grid1
+  power:
+    source: mqtt
+    topic:  /envoy/json
+    jq: .[1].activePower | tonumber
+    timeout: 30s
+    scale: 1
+- type: custom
+  name: mqtt_production
+  power:
+    source: mqtt
+    topic:  /envoy/json
+    jq: .[0].activePower | tonumber
+    timeout: 30s # don't accept values older than timeout
+    scale: 1
+
+chargers:
+- type: template
+  template: ocpp
+  name: wallbox3
+  remotestart: true
+
+vehicles:
+  - name: seal
+    type: custom
+    title: BYD Seal
+    capacity: 82.5
+    phases: 1
+    soc:
+      source: http
+      uri: https://api.iternio.com/1/tlm/get_telemetry?token=[redacted]&api_key=[redacted]
+      jq: .result.telemetry.soc
+      timeout: 10s
+
+tariffs:
+  currency: AUD
+  grid:
+    type: fixed
+    price: 0.3285
+    zones:
+      hours: 0-6
+      price: 0.08
+  feedin:
+    type: fixed
+    price: 0.05
+
+loadpoints:
+- title: Garage
+  charger: wallbox3
+  mode: pv
+  vehicle: seal
+  enable:
+    delay: 1m
+    threshold: -2000
+  disable:
+    delay: 5m
+    threshold: 500
+
+site:
+  title: Home
+  meters:
+    grid: grid1
+    pv:
+    - mqtt_production
+
+mqtt:
+  broker: 10.0.0.122:1883
+  topic: evcc # root topic for publishing, set empty to disable
+  user: [redacted]
+  password: [redacted]
+
+sponsortoken:
